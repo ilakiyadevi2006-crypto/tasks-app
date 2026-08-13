@@ -14,36 +14,48 @@ export default function SignupPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLoading(true);
-    setError(null);
-    setMessage(null);
+  event.preventDefault();
 
-    const supabase = createClient();
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+  setLoading(true);
+  setError(null);
+  setMessage(null);
+
+  const supabase = createClient();
+
+  // Create a unique ID for this signup request
+  const verificationId = crypto.randomUUID();
+
+  const { data, error: signUpError } = await supabase.auth.signUp({
+    email,
+    password,
+
+    options: {
+      emailRedirectTo: `${window.location.origin}/auth/callback?verification_id=${verificationId}`,
+
+      data: {
+        verification_id: verificationId,
       },
-    });
+    },
+  });
 
-    if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
-      return;
-    }
-
-    if (data.session) {
-      router.push("/dashboard");
-      router.refresh();
-      return;
-    }
-
-    setMessage("Check your email to confirm your account, then sign in.");
+  if (signUpError) {
+    setError(signUpError.message);
     setLoading(false);
+    return;
   }
 
+  if (data.session) {
+    router.push("/dashboard");
+    router.refresh();
+    return;
+  }
+
+  setMessage(
+    "Check your email to confirm your account. You can open the email on any device."
+  );
+
+  setLoading(false);
+}
   return (
     <div>
       <h1 className="text-xl font-semibold text-white">Create account</h1>
