@@ -1,48 +1,38 @@
-import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const requestUrl = new URL(request.url);
 
-  // PKCE/code-based confirmation
-  const code = searchParams.get("code");
-
-  // Token-hash based confirmation
-  const token_hash = searchParams.get("token_hash");
-  const type = searchParams.get("type");
-
-  const next = searchParams.get("next") ?? "/dashboard";
+  const code = requestUrl.searchParams.get("code");
+  const token_hash = requestUrl.searchParams.get("token_hash");
+  const type = requestUrl.searchParams.get("type");
+  const next = requestUrl.searchParams.get("next") || "/dashboard";
 
   const supabase = await createClient();
 
-  // ----------------------------------------
-  // 1. Handle code-based authentication
-  // ----------------------------------------
+  // Handle PKCE callback
   if (code) {
-    const { error } =
-      await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      redirect(`${origin}${next}`);
+      return NextResponse.redirect(new URL(next, requestUrl.origin));
     }
   }
 
-  // ----------------------------------------
-  // 2. Handle email confirmation
-  // ----------------------------------------
+  // Handle email confirmation
   if (token_hash && type) {
     const { error } = await supabase.auth.verifyOtp({
-      type: type as "email",
       token_hash,
+      type: type as "signup" | "email" | "recovery" | "invite",
     });
 
     if (!error) {
-      redirect(`${origin}/login?confirmed=true`);
+      return NextResponse.redirect(new URL("/dashboard", requestUrl.origin));
     }
   }
 
-  // ----------------------------------------
-  // 3. Authentication failed
-  // ----------------------------------------
-  redirect(`${origin}/login?error=auth`);
+  return NextResponse.redirect(
+    new URL("/login?error=auth", requestUrl.origin)
+  );
 }
